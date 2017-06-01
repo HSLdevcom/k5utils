@@ -30,8 +30,8 @@ current working directory, following should work:
 
     docker run -ti --rm -v $(pwd):/opt oscad <ARGS...>
 
-If you whish to run any other command (such as `cinder`, `glance`, or `nova`)
-or inspect the container, change the entrypoint:
+If you whish to run any other command (such as `heat` or `nova`) or inspect the
+container, change the entrypoint:
 
     docker run -ti --rm -v $(pwd):/opt --entrypoint /bin/sh oscad
 

@@ -8,11 +8,15 @@ COPY wrapper.sh /usr/local/bin/openstack-wrapper.sh
 
 RUN set -x \
   && chmod -c 755 /usr/local/bin/openstack-wrapper.sh \
-  && apk add --no-cache --update build-base git linux-headers py-pip python-dev \
+  && apk add --no-cache --update build-base git linux-headers py-pip python-dev
+
+RUN set -x \
   && pip install git+https://github.com/openstack/python-openstackclient.git
-  ## pip install git+https://github.com/openstack/python-glanceclient.git
-  ## pip install git+https://github.com/openstack/python-heatclient.git
-  ## pip install git+https://github.com/openstack/python-novaclient.git
+
+RUN set -x \
+  && pip install git+https://github.com/openstack/python-heatclient.git \
+  && pip install git+https://github.com/openstack/python-novaclient.git \
+  && pip install git+https://github.com/openstack/python-swiftclient.git
 
 VOLUME /opt
 
