@@ -28,12 +28,16 @@ The `openstack` command is set as the entrypoint to the container, thus any and
 all arguments are passed to it by default. Assuming the `identity.sh` is in
 current working directory, following should work:
 
-    docker run -ti --rm -v $(pwd):/opt oscad <ARGS...>
+    docker run -ti --rm -v $(pwd):/vol oscad <ARGS...>
 
 If you whish to run any other command (such as `heat` or `nova`) or inspect the
 container, change the entrypoint:
 
-    docker run -ti --rm -v $(pwd):/opt --entrypoint /bin/sh oscad
+    docker run -ti --rm -v $(pwd):/vol --entrypoint /bin/sh oscad
 
 You must source authentication credentials manually when using non-default
 entrypoint!
+
+## License
+
+[ISC](LICENSE)

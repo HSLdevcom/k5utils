@@ -1,0 +1,13 @@
+--- /usr/lib/python2.7/site-packages/keystoneauth1/identity/generic/base.py
++++ /usr/lib/python2.7/site-packages/keystoneauth1/identity/generic/base.py
+@@ -136,10 +136,6 @@
+         except (exceptions.DiscoveryFailure,
+                 exceptions.HttpError,
+                 exceptions.ConnectionError):
+-            LOG.warning('Failed to discover available identity versions when '
+-                        'contacting %s. Attempting to parse version from URL.',
+-                        self.auth_url)
+-
+             url_parts = urlparse.urlparse(self.auth_url)
+             path = url_parts.path.lower()
+

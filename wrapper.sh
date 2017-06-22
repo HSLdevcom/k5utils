@@ -2,11 +2,13 @@
 
 set -eu
 
-if [ -f "/opt/identity.sh" ]; then
-  . "/opt/identity.sh"
+cd /vol
+
+if [ -f identity.sh ]; then
+  . identity.sh
 else
   echo
-  echo "ERROR: File /opt/identity.sh not found"
+  echo "ERROR: Cannot find file identity.sh from volume"
   echo "ERROR: Unable to source authentication credentials"
   echo
 fi
