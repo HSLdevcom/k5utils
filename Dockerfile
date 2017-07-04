@@ -1,18 +1,11 @@
-# oscad
+# k5utils
 
 FROM alpine:latest
 
 LABEL maintainer="dev@starck.fi"
 
-COPY unannoy.patch /tmp/unannoy.patch
-COPY wrapper.sh /usr/local/bin/openstack-wrapper.sh
-
 RUN set -x \
-  && mkdir /vol \
-  && chmod -c 755 /usr/local/bin/openstack-wrapper.sh \
-  && apk add --no-cache --update build-base git linux-headers py-pip python-dev
-
-RUN set -x \
+  && apk add --no-cache --update bash build-base curl git jq linux-headers py-pip python-dev \
   && pip install git+https://github.com/openstack/python-openstackclient.git
 
 RUN set -x \
@@ -20,9 +13,15 @@ RUN set -x \
   && pip install git+https://github.com/openstack/python-novaclient.git \
   && pip install git+https://github.com/openstack/python-swiftclient.git
 
+COPY initrc /root/.bashrc
+COPY unannoy.patch /tmp/unannoy.patch
+COPY k5-image-import.py /usr/local/bin/k5-image-import.py
+
 RUN set -x \
-  && patch -p0 < /tmp/unannoy.patch
+  && mkdir /vol \
+  && patch -p0 < /tmp/unannoy.patch \
+  && chmod -c 755 /usr/local/bin/k5-image-import.py
 
 VOLUME /vol
 
-ENTRYPOINT ["/usr/local/bin/openstack-wrapper.sh"]
+ENTRYPOINT ["/bin/bash"]

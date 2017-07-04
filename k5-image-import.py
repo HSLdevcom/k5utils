@@ -20,12 +20,21 @@ from swiftclient.service import SwiftError, SwiftService, SwiftUploadObject
 
 from pprint import pprint
 
-IMPORT_STATUS_INTERVAL = 42
+DEBUG_MODE = False
+STATUS_LOOP_LIMIT = 40
+IMPORT_STATUS_WAIT = 300
+IMPORT_STATUS_INTERVAL = 60
 IMPORT_STATUS_MSG = 'Status: HTTP {} {} ({}%)'
 IMPORT_BASE_URL = 'https://vmimport.{}.cloud.global.fujitsu.com/v1/imageimport'
 
-HELP_MIN_DISK = 'Minimum amount of disk space required to use the image'
-HELP_MIN_RAM = 'Minimum amount of memory required to use the image'
+HELP_DEBUG = 'Print debug information'
+HELP_MIN_RAM = 'Minimum amount of memory required to use the image (MB)'
+HELP_MIN_DISK = 'Minimum amount of disk space required to use the image (GB)'
+
+# Following regions require more arguments than e.g. UK region. So when one of
+# these regions are detected, additional arguments are included to image
+# registeration request.
+DEMANDING_REGIONS = ['de-1', 'es-1', 'fi-1']
 
 # "Fujitsu Cloud Service K5 IaaS Foundation Service API Reference version 2.0"
 # says that the possible values include: Rhel | centos | ubuntu
@@ -35,6 +44,16 @@ HELP_OS_TYPE = \
 """Specify the type of the operating system. See some documentation for
 possible values. If not specified, default value 'ubuntu' is used."""
 
+SUCCESS_MSG = """
+Import/register status: {}
+ID:                     {}
+Name:                   {}
+Minimum RAM/disk        {} MB / {} GB
+"""
+
+
+def debug(obj):
+    if DEBUG_MODE: pprint(obj)
 
 def get_env(name):
     try:
@@ -63,33 +82,40 @@ def upload(opts):
             for res in swift.upload(opts['container'], [image]):
                 if 'response_dict' in res:
                     res['response_dict']['response_dicts'] = []
-                pprint(res)
+                debug(res)
         except SwiftError as e:
             print("error: %s" % str(e), file=sys.stderr)
 
 
 def register(opts):
     action_url = IMPORT_BASE_URL.format(opts['region'])
+
     location = '/v1/AUTH_{}/{}/{}'.format(
         opts['project_id'],
         opts['container'],
         opts['image_file']
     )
+
     headers = ({
         'Content-Type': 'application/json',
         'X-Auth-Token': opts['os_auth_token']
     })
+
     payload = {
         'id': opts['image_id'],
         'name': opts['image_name'],
         'location': location,
-        'conversion': 'true',
-        'disk_format': 'raw',
-        'os_type': opts['os_type'],
-        'user_name': opts['username'],
-        'password': b64encode(opts['password']),
-        'domain_name': opts['domain_name']
+        'os_type': opts['os_type']
     }
+
+    if opts['region'] in DEMANDING_REGIONS:
+        payload.update({
+            'conversion': True,
+            'disk_format': 'raw',
+            'user_name': opts['username'],
+            'password': b64encode(opts['password']),
+            'domain_name': opts['domain_name']
+        })
 
     if opts['sha1']:
         payload.update({ 'checksum': opts['sha1'] })
@@ -98,28 +124,36 @@ def register(opts):
     if opts['min_disk']:
         payload.update({ 'min_disk': opts['min_disk'] })
 
-    pprint(payload)
+    debug(payload)
     job = requests.post(action_url, headers=headers, data=json.dumps(payload)).json()
-    pprint(job)
+    debug(job)
 
-    countdown = 99
+    if not 'import_id' in job:
+        print("error: Field 'import_id' not in image register reply", file=sys.stderr)
+        sys.exit(1)
+
+    sleep(IMPORT_STATUS_WAIT)
+    loop_limit = STATUS_LOOP_LIMIT
     status_url = (IMPORT_BASE_URL + '/{}/status').format(opts['region'], job['import_id'])
 
-    while countdown > 0:
-        countdown -= 1
+    while loop_limit > 0:
+        loop_limit -= 1
         res = requests.get(status_url, headers=headers)
-        data = res.json()
-        pprint(data)
-        status = data.get('import_status', 'unknown')
-        print(IMPORT_STATUS_MSG.format(res.status_code, status, data.get('progress', '?')))
-        if status not in ['succeeded', 'failed']:
-            sleep(IMPORT_STATUS_INTERVAL)
+        res_body = res.json()
+        debug(res_body)
+        status = res_body.get('import_status', 'unknown')
+        print(IMPORT_STATUS_MSG.format(res.status_code, status, res_body.get('progress', '?')))
+        if status in ['succeeded', 'failed']:
+            return res_body
         else:
-            return status
+            sleep(IMPORT_STATUS_INTERVAL)
 
 
 def main():
+    global DEBUG_MODE
+
     parser = ArgumentParser()
+    parser.add_argument('--debug', action='store_true', help=HELP_DEBUG)
     parser.add_argument('-d', '--min-disk', type=int, help=HELP_MIN_DISK)
     parser.add_argument('-r', '--min-ram', type=int, help=HELP_MIN_RAM)
     parser.add_argument('-o', '--os-type', help=HELP_OS_TYPE)
@@ -128,6 +162,8 @@ def main():
     parser.add_argument('FILE', help='Path to the VMDK image file')
     parser.add_argument('NAME', help='Name of the image')
     args = parser.parse_args()
+
+    DEBUG_MODE = args.debug
 
     path = os.path.abspath(args.FILE)
 
@@ -178,13 +214,22 @@ def main():
         print("error: Please check required environment variables", file=sys.stderr)
         sys.exit(1)
 
-    pprint(opts)
+    debug(opts)
     upload(opts)
-    status = register(opts)
+    last_state = register(opts)
 
-    if status != 'succeeded':
-        print("error: Image import failed", file=sys.stderr)
+    if last_state.get('import_status') != 'succeeded':
+        print("\nerror: Image import failed", file=sys.stderr)
+        debug(last_state)
         sys.exit(1)
+    else:
+        print(SUCCESS_MSG.format(
+            last_state.get('import_status'),
+            last_state.get('id'),
+            last_state.get('name'),
+            last_state.get('min_ram'),
+            last_state.get('min_disk')
+        ))
 
 
 if __name__ == "__main__":
