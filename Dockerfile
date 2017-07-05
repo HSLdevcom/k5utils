@@ -15,12 +15,12 @@ RUN set -x \
 
 COPY initrc /root/.bashrc
 COPY unannoy.patch /tmp/unannoy.patch
-COPY k5-image-import.py /usr/local/bin/k5-image-import.py
+COPY k5-image-import /usr/local/bin/k5-image-import
 
 RUN set -x \
   && mkdir /vol \
   && patch -p0 < /tmp/unannoy.patch \
-  && chmod -c 755 /usr/local/bin/k5-image-import.py
+  && chmod -c 755 /usr/local/bin/k5-image-import
 
 VOLUME /vol
 
