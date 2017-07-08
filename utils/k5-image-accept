@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -eu
+
+if [ -z "${1:-}" ]; then
+  echo "Accept pending image sharing in current project"
+  echo
+  echo " $ ${0##*/} <image_id> [project_id]"
+  echo
+  echo "The ID of the shared image is required. The ID of the (current) project,"
+  echo "image service endpoint URL, and valid authentication token are picked from"
+  echo "environment variables (OS_PROJECT_ID, IMAGE, and OS_AUTH_TOKEN respectively)."
+  echo
+  echo "See k5utils package for details, https://github.com/humppa/k5utils"
+  exit 1
+fi
+
+IID=$1
+PROJECT=${2:-$OS_PROJECT_ID}
+ENDPOINT=$IMAGE
+
+curl -s -X PUT $ENDPOINT/v2/images/$IID/members/$PROJECT \
+  -H "X-Auth-Token: $OS_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "accepted"}' | jq

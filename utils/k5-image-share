@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -eu
+
+if [ -z "${1:-}" ]; then
+  echo "Send image sharing request to current project"
+  echo
+  echo " $ ${0##*/} <image_id> <dest_project_id>"
+  echo
+  echo "Give the ID of the image and the ID of the destination project as arguments."
+  echo "In addition, image service endpoint and valid authentication token are picked"
+  echo "from environment variables (IMAGE and OS_AUTH_TOKEN respectively)."
+  echo
+  echo "See k5utils package for details, https://github.com/humppa/k5utils"
+  exit 1
+fi
+
+IID=$1
+PROJECT=$2
+ENDPOINT=$IMAGE
+
+curl -s -X POST $ENDPOINT/v2/images/$IID/members \
+  -H "X-Auth-Token: $OS_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"member": "'$PROJECT'"}' | jq
