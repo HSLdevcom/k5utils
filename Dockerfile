@@ -5,7 +5,8 @@ FROM alpine:latest
 LABEL maintainer="dev@starck.fi"
 
 RUN set -x \
-  && apk add --no-cache --update bash build-base curl git jq linux-headers py-pip python-dev \
+  && apk add --no-cache --update bash build-base curl git jq libffi-dev \
+         linux-headers openssl-dev py-pip python-dev \
   && pip install git+https://github.com/openstack/python-openstackclient.git
 
 RUN set -x \
