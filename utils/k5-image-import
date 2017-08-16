@@ -6,19 +6,17 @@ from __future__ import print_function
 import os
 import sys
 import json
+
+from argparse import ArgumentParser
+from base64 import b64encode
+from pprint import pprint
+from time import sleep
+from uuid import uuid4
+
 import requests
 
-from uuid import uuid4
-from time import sleep
-from base64 import b64encode
-from argparse import ArgumentParser
-
-from keystoneauth1 import session as v1session
-from keystoneauth1.identity import v3 as v1identity
-from keystoneclient.v3 import client as v3client
+from keystoneauth1 import loading, session
 from swiftclient.service import SwiftError, SwiftService, SwiftUploadObject
-
-from pprint import pprint
 
 DEBUG_MODE = False
 STATUS_LOOP_LIMIT = 40
@@ -58,26 +56,37 @@ def debug(obj):
     if DEBUG_MODE: pprint(obj)
 
 def get_env(name):
+    """
+    Get environment variable and return it
+    """
     try:
         val = os.environ[name]
-    except KeyError as e:
+    except KeyError:
         print("error: Environment variable %s not set" % name, file=sys.stderr)
         sys.exit(1)
     return val
 
 
 def get_auth_token(opts):
-    auth = v1identity.Password(
+    """
+    Authenticate using keystone session and return auth token
+    """
+    loader = loading.get_plugin_loader('password')
+    auth = loader.load_from_options(
         auth_url=opts['auth_url'],
         username=opts['username'],
         password=opts['password'],
         project_id=opts['project_id'],
         user_domain_name=opts['domain_name']
     )
-    return v1session.Session(auth=auth).get_auth_headers()
+    sess = session.Session(auth=auth).get_auth_headers()
+    return sess.get_auth_headers().get('X-Auth-Token', None)
 
 
 def upload(opts):
+    """
+    Upload image file to object storage
+    """
     image = SwiftUploadObject(opts['image_file'])
     with SwiftService({'os_auth_token': opts['os_auth_token']}) as swift:
         try:
@@ -85,11 +94,23 @@ def upload(opts):
                 if 'response_dict' in res:
                     res['response_dict']['response_dicts'] = []
                 debug(res)
-        except SwiftError as e:
-            print("error: %s" % str(e), file=sys.stderr)
+        except SwiftError as err:
+            print("error: %s" % str(err), file=sys.stderr)
 
 
 def register(opts):
+    """
+    Register uploaded image
+
+    Registeration has two phases. First a registeration request is send to API,
+    and after that, API is polled for registeration status until registeration
+    has succeeded or failed.
+
+    Please, consult Fujitsu Foundation Service API Reference sections 1.6.3.1
+    and 1.6.3.2 for details.
+
+    Returns the results of the last status query.
+    """
     action_url = IMPORT_BASE_URL.format(opts['region'])
 
     location = '/v1/AUTH_{}/{}/{}'.format(
@@ -120,17 +141,17 @@ def register(opts):
         })
 
     if opts['sha1']:
-        payload.update({ 'checksum': opts['sha1'] })
+        payload.update({'checksum': opts['sha1']})
     if opts['min_ram']:
-        payload.update({ 'min_ram': opts['min_ram'] })
+        payload.update({'min_ram': opts['min_ram']})
     if opts['min_disk']:
-        payload.update({ 'min_disk': opts['min_disk'] })
+        payload.update({'min_disk': opts['min_disk']})
 
     debug(payload)
     job = requests.post(action_url, headers=headers, data=json.dumps(payload)).json()
     debug(job)
 
-    if not 'import_id' in job:
+    if 'import_id' not in job:
         print("error: Field 'import_id' not in image register reply", file=sys.stderr)
         sys.exit(1)
 
@@ -155,6 +176,7 @@ def register(opts):
 
 
 def main():
+    # pylint: disable=W0603
     global DEBUG_MODE
 
     parser = ArgumentParser()
@@ -196,30 +218,22 @@ def main():
     }
 
     if 'CONTRACT' in os.environ:
-        opts.update({ 'domain_name': os.environ['CONTRACT'] })
+        opts.update({'domain_name': os.environ['CONTRACT']})
     elif 'OS_DEFAULT_DOMAIN' in os.environ:
-        opts.update({ 'domain_name': os.environ['OS_DEFAULT_DOMAIN'] })
+        opts.update({'domain_name': os.environ['OS_DEFAULT_DOMAIN']})
     else:
         print("error: Environment variables CONTRACT or OS_DEFAULT_DOMAIN not set", file=sys.stderr)
         sys.exit(1)
 
-    try:
-        print("Authenticating...")
-        auth_headers = get_auth_token(opts)
-    except:
-        print("error: Authentication failed", file=sys.stderr)
+    print("Authenticating...")
+    token = get_auth_token(opts)
+
+    if not token:
+        print("error: Failed to acquire authentication token", file=sys.stderr)
         print("error: Please check required environment variables", file=sys.stderr)
         sys.exit(1)
 
-    opts.update({
-        'os_auth_token': auth_headers.get('X-Auth-Token', None)
-    })
-
-    if not opts['os_auth_token']:
-        print("error: Unable to get authentication token", file=sys.stderr)
-        print("error: Please check required environment variables", file=sys.stderr)
-        sys.exit(1)
-
+    opts.update({'os_auth_token': token})
     debug(opts)
 
     print("Uploading to object storage...")
