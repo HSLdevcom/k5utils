@@ -15,7 +15,7 @@ from uuid import uuid4
 
 import requests
 
-from keystoneauth1 import loading, session
+from keystoneauth1 import loading, session, exceptions
 from swiftclient.service import SwiftError, SwiftService, SwiftUploadObject
 
 DEBUG_MODE = False
@@ -79,8 +79,17 @@ def get_auth_token(opts):
         project_id=opts['project_id'],
         user_domain_name=opts['domain_name']
     )
-    sess = session.Session(auth=auth).get_auth_headers()
-    return sess.get_auth_headers().get('X-Auth-Token', None)
+    sess = session.Session(auth=auth)
+    try:
+        headers = sess.get_auth_headers()
+        token = headers.get('X-Auth-Token', None)
+    except exceptions.http.Unauthorized:
+        print("error: Unauthorized", file=sys.stderr)
+        sys.exit(1)
+    except:
+        print("error: Authentication failed", file=sys.stderr)
+        sys.exit(1)
+    return token
 
 
 def upload(opts):
