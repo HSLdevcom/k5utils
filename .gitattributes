@@ -1,0 +1,4 @@
+/bashrc text  eol=lf
+/inputrc  text  eol=lf
+/unannoy.patch  text  eol=lf
+/utils/k5-* text  eol=lf

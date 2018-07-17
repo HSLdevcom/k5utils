@@ -11,28 +11,41 @@ register custom operating system images.
 
 ## Prerequisites
 
-You need to have a directory, which can be bind mounted to the container. The
-directory is used to save and convey authentication credentials (and possibly
-any other data) into the containerized environment.
+The following environment variables should be set inside the container:
 
-Also `set-k5env.sh` script must reside in the aforementioned directory. It is
-used to authenticate, set up environment, and save credentials for future use.
-You can download the script from either of these repositories:
+* OS_USERNAME
+* OS_PASSWORD
+* OS_REGION_NAME
+* OS_USER_DOMAIN_NAME
+* OS_PROJECT_NAME
+* OS_PROJECT_ID
+* OS_AUTH_URL
+* OS_VOLUME_API_VERSION
+* OS_IDENTITY_API_VERSION
+
+If you have the values at hand you can pass them to docker with `--env-file`
+and `-e`. Or you can use an interactive setup script such as:
 
 * [humppa/k5env-script](https://github.com/humppa/k5env-script)
 * [fujitsuk5/k5env-script](https://github.com/fujitsuk5/k5env-script)
 
+If you need to convey any data (for example, the setup script) into the
+container environment, use volumes.
+
 ## Usage
 
-Following assumes that you have created a directory `~/.k5` and downloaded the
-environment script to `~/.k5/set-k5env.sh`.
+Build the image:
 
-After building the container, run it:
+    docker build -t local/k5utils .
 
-    docker run -ti --rm -v $HOME/.k5:/vol CONTAINER
+After building the container, just run it:
 
-It will first set up the environment and the drop you to the shell. The
-`openstack`, `heat`, `nova`, and `swift` clients are available.
+    docker run -it --rm --env-file=<os.env> local/k5utils
+
+It will drop you to the shell. If you didn't set the environment variables
+already you might need to run your setup script now.
+
+The `openstack`, `heat`, `nova`, and `swift` clients are available for you.
 
 ### Uploading an image to K5
 

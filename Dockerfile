@@ -1,5 +1,4 @@
 # k5utils
-
 FROM alpine:latest
 
 LABEL maintainer="dev@starck.fi"
@@ -20,10 +19,7 @@ COPY utils/ /usr/local/bin/
 COPY unannoy.patch /tmp/unannoy.patch
 
 RUN set -x \
-  && mkdir /vol \
-  && patch -p0 < /tmp/unannoy.patch \
+  && patch /usr/lib/python2.7/site-packages/keystoneauth1/identity/generic/base.py /tmp/unannoy.patch \
   && chmod -c 755 /usr/local/bin/k5-*
 
-VOLUME /vol
-
-ENTRYPOINT ["/bin/bash"]
+CMD ["/bin/bash"]
